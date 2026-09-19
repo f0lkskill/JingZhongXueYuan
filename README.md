@@ -1,2 +1,3 @@
-# ProfileWebSite
+# 晋中学院官方网站（fake）
 我的个人 github.io 部署网站。
+用于诈骗整人。
