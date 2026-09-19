@@ -1,209 +1,1750 @@
 <!DOCTYPE html>
-<html lang="zh">
-<head>
- <meta charset="UTF-8">
- <title>WebGL 手势控制爱心粒子</title>
- <style>
-     body { margin: 0; overflow: hidden; background-color: #000; }
-     #canvas-container { width: 100vw; height: 100vh; position: absolute; top: 0; left: 0; z-index: 1; }
-     /* 隐藏摄像头视频流，只用于后台分析 */
-     .input_video { display: none; }
-     #loading {
-         position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-         color: white; font-family: sans-serif; font-size: 24px; pointer-events: none; z-index: 10;
-     }
- </style>
- <!-- 引入 Three.js -->
- <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
- <!-- 引入 MediaPipe Hands -->
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<!-- saved from url=(0024)https://www.jzxy.edu.cn/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+
+<meta name="application-name" content="晋中学院">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="renderer" content="webkit">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="format-detection" content="telephone=no, email=no">
+<meta name="HandheldFriendly" content="true">
+<meta name="SiteName" content="晋中学院">
+<meta name="Keywords" content="">
+<meta name="Description" content="">
+<title>晋中学院</title>
+
+    <link rel="stylesheet" type="text/css" href="./晋中学院_files/swiper.min.css">
+    <link rel="stylesheet" type="text/css" href="./晋中学院_files/animate.min.css">
+    <link rel="stylesheet" type="text/css" href="./晋中学院_files/index.css">
+    <script type="text/javascript" src="./晋中学院_files/swiper.js.下载"></script><link type="text/css" rel="stylesheet" id="dark-mode-custom-link"><link type="text/css" rel="stylesheet" id="dark-mode-general-link"><style lang="en" type="text/css" id="dark-mode-custom-style"></style><style lang="en" type="text/css" id="dark-mode-native-style"></style><style lang="en" type="text/css" id="dark-mode-native-sheet"></style>
+    <script type="text/javascript" src="./晋中学院_files/jquery.js.下载"></script>
+    <script type="text/javascript" src="./晋中学院_files/wow.min.js.下载"></script>
 </head>
 <body>
-
-<div id="loading">正在加载模型与摄像头...<br>请允许摄像头权限</div>
-<div id="canvas-container"></div>
-<video class="input_video"></video>
-
-<script>
- // --- 1. Three.js 场景初始化 ---
- const scene = new THREE.Scene();
- const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
- camera.position.z = 30;
-
- const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
- renderer.setSize(window.innerWidth, window.innerHeight);
- document.getElementById('canvas-container').appendChild(renderer.domElement);
-
- // --- 2. 创建爱心粒子系统 ---
- const particleCount = 3000; // 粒子数量
- const geometry = new THREE.BufferGeometry();
- const positions = new Float32Array(particleCount * 3);
- const targetPositions = new Float32Array(particleCount * 3); // 存储爱心形状的目标位置
- const randomPositions = new Float32Array(particleCount * 3); // 存储散开时的随机位置
-
- // 爱心方程函数
- function getHeartPosition(t, scale = 1) {
-     const x = 16 * Math.pow(Math.sin(t), 3);
-     const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
-     const z = 0; 
-     return { x: x * scale, y: y * scale, z: z * scale };
- }
-
- for (let i = 0; i < particleCount; i++) {
-     // 生成爱心形状的目标点
-     // 为了让爱心立体一点，我们随机分布t，并在Z轴加一点随机扰动
-     const t = Math.random() * Math.PI * 2;
-     const scale = 0.5; 
-     const heartPos = getHeartPosition(t, scale);
-     
-     // 填充爱心内部 (随机缩放)
-     const r = Math.sqrt(Math.random()); 
-     
-     targetPositions[i * 3] = heartPos.x * r;
-     targetPositions[i * 3 + 1] = heartPos.y * r;
-     targetPositions[i * 3 + 2] = (Math.random() - 0.5) * 5; // Z轴厚度
-
-     // 生成散开的随机位置 (爆炸效果)
-     randomPositions[i * 3] = (Math.random() - 0.5) * 100;
-     randomPositions[i * 3 + 1] = (Math.random() - 0.5) * 60;
-     randomPositions[i * 3 + 2] = (Math.random() - 0.5) * 50;
-
-     // 初始位置设为散开状态
-     positions[i * 3] = randomPositions[i * 3];
-     positions[i * 3 + 1] = randomPositions[i * 3 + 1];
-     positions[i * 3 + 2] = randomPositions[i * 3 + 2];
- }
-
- geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
- // 粒子材质
- const material = new THREE.PointsMaterial({
-     color: 0xff69b4, // 热粉色
-     size: 0.4,
-     transparent: true,
-     opacity: 0.8,
-     blending: THREE.AdditiveBlending
- });
-
- const particles = new THREE.Points(geometry, material);
- scene.add(particles);
-
- // --- 3. 交互逻辑变量 ---
- let gatherFactor = 0; // 0 = 完全散开, 1 = 完全聚合成爱心
- let targetGatherFactor = 0; // 目标聚合度，由手势控制
-
- // --- 4. MediaPipe Hands 配置 ---
- const videoElement = document.getElementsByClassName('input_video')[0];
-
- function onResults(results) {
-     document.getElementById('loading').style.display = 'none';
-
-     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-         const landmarks = results.multiHandLandmarks[0];
-
-         // 计算手掌开合程度
-         // 简单算法：计算拇指指尖(4)与其他四指指尖(8,12,16,20)到手腕(0)的平均距离
-         const wrist = landmarks[0];
-         const fingerTips = [4, 8, 12, 16, 20];
-         let totalDist = 0;
-
-         fingerTips.forEach(idx => {
-             const tip = landmarks[idx];
-             const dist = Math.sqrt(
-                 Math.pow(tip.x - wrist.x, 2) + 
-                 Math.pow(tip.y - wrist.y, 2)
-             );
-             totalDist += dist;
-         });
-
-         const avgDist = totalDist / 5;
-
-         // 经验阈值：
-         // 握拳时，指尖距离手腕很近 (avgDist 约 0.1 - 0.2)
-         // 张开时，指尖距离手腕较远 (avgDist 约 0.4 - 0.6)
-         // 我们做一个映射：握拳(distance small) -> 聚合(factor 1), 张开 -> 散开(factor 0)
-         
-         // 动态调整这些阈值以适应摄像头的距离
-         const closeThreshold = 0.25; 
-         const openThreshold = 0.5;
-
-         let normalized = (avgDist - closeThreshold) / (openThreshold - closeThreshold);
-         normalized = 1 - Math.min(Math.max(normalized, 0), 1); // 反转：距离越小(握拳)，值越大(1)
-
-         targetGatherFactor = normalized; 
-
-     } else {
-         // 如果没有检测到手，默认缓慢散开
-         targetGatherFactor = 0;
-     }
- }
-
- const hands = new Hands({locateFile: (file) => {
-     return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
- }});
-
- hands.setOptions({
-     maxNumHands: 1,
-     modelComplexity: 1,
-     minDetectionConfidence: 0.5,
-     minTrackingConfidence: 0.5
- });
-
- hands.onResults(onResults);
-
- const cameraUtils = new Camera(videoElement, {
-     onFrame: async () => {
-         await hands.send({image: videoElement});
-     },
-     width: 640,
-     height: 480
- });
- cameraUtils.start();
-
- // --- 5. 动画循环 ---
- function animate() {
-     requestAnimationFrame(animate);
-
-     // 粒子自身旋转动画
-     particles.rotation.y += 0.002;
-
-     // 平滑过渡聚合系数 (Lerp)
-     gatherFactor += (targetGatherFactor - gatherFactor) * 0.05;
-
-     // 更新粒子位置
-     const posAttr = particles.geometry.attributes.position;
-     const currentPositions = posAttr.array;
-
-     for (let i = 0; i < particleCount; i++) {
-         const idx = i * 3;
-         
-         // 目标位置插值：从 randomPositions 过渡到 targetPositions
-         const tx = randomPositions[idx] + (targetPositions[idx] - randomPositions[idx]) * gatherFactor;
-         const ty = randomPositions[idx+1] + (targetPositions[idx+1] - randomPositions[idx+1]) * gatherFactor;
-         const tz = randomPositions[idx+2] + (targetPositions[idx+2] - randomPositions[idx+2]) * gatherFactor;
-
-         // 增加一点动态浮动效果
-         currentPositions[idx] += (tx - currentPositions[idx]) * 0.1;
-         currentPositions[idx+1] += (ty - currentPositions[idx+1]) * 0.1;
-         currentPositions[idx+2] += (tz - currentPositions[idx+2]) * 0.1;
-     }
-
-     posAttr.needsUpdate = true;
-     renderer.render(scene, camera);
- }
-
- animate();
-
- // 窗口大小调整适配
- window.addEventListener('resize', () => {
-     camera.aspect = window.innerWidth / window.innerHeight;
-     camera.updateProjectionMatrix();
-     renderer.setSize(window.innerWidth, window.innerHeight);
- });
+<style>
+  a{text-decoration:none}
+  #fixedBox {
+    position: fixed;top: 45%;right:20px;display:flex;flex-direction: column;align-items:center;z-index:99;
+    background:#fff;border-radius:10px;padding:16px 18px;box-shadow: 0 0 4px 2px rgba(0,0,0,.1); 
+  }
+  .fixed-tt { text-align:center;font-size:15px;color:rgba(1,91,177,1);font-weight:bold;}
+  .code-tt { font-size:14px;}
+  .fixed-img img { width:100px;height:100px;margin-top:10px;}
+  .window-close { 
+    width: 40px;height: 26px;font-size: 14px;color:#333;text-align: center;line-height: 26px;cursor: pointer;background: #fff;box-shadow: 0 0 4px 2px rgba(0,0,0,.1); 
+    position:absolute;right:-13px;top:-13px;width:26px;height:26px;border-radius:50%;text-align:center;line-height:26px;font-size:18px;
+  }
+  @media screen and (max-width: 768px) {
+    #fixedBox {display:none;}
+    .new .new-more{font-size:0.875rem}
+    .teaching .swiper-more{font-size:0.875rem}
+    .lectures .lectures-more{font-size:0.875rem}
+    .special .special-more{font-size:0.875rem}
+    .medium .medium-more{font-size:0.875rem}
+    .footer{background: #0D2D8C;}
+    .footer .information {background:url(/templates/index/image/zzjg/footer-banner-index.png) no-repeat top / 100% 100% #0D2D8C}
+  }
+  </style>
+<!--   首页悬浮弹窗 -->
+<div id="fixedBox">
+    <a href="https://www.jzxy.edu.cn/index_tzgg/content_93139.html" target="_blank">
+      <div class="fixed-tt">晋中学院</div>
+      <div class="fixed-tt">高层次人才引进公告</div>
+    </a>
+    <a href="https://www.jzxy.edu.cn/index_tzgg/content_93139.html" target="_blank" class="fixed-img">
+      <img src="./晋中学院_files/人才公告二维码.png">
+    </a>
+    <a href="https://www.jzxy.edu.cn/index_tzgg/content_93139.html" target="_blank" class="code-tt">
+      手机扫一扫
+    </a>
+    <div class="window-close" onclick="document.getElementById('fixedBox').style.display='none'">
+      x
+    </div>
+</div>
+<!--    导航-->
+<div class="header pr">
+  <!-- pc端导航-->
+  <div class="header-block flex-c">
+    <div class="header-block-top flex-c-sb">
+        <a class="header-block-top-logo flex-c" target="_blank" href="https://www.jzxy.edu.cn/">
+                <img src="./晋中学院_files/logo.png" class="img-cover">
+        </a>
+        <ul class="header-web-top-nav flex">
+    <li class="first-nav">
+    <a href="http://www.jzxy.edu.cn/xygk.html" target="_blank">学校概况</a>
+    <!--子循环-->
+        <ul>
+           <li><a href="http://www.jzxy.edu.cn/xyjj.html" target="_blank">学校简介</a></li>
+           <li><a href="http://www.jzxy.edu.cn/bxdw.html" target="_blank">办学定位</a></li>
+           <li><a href="http://www.jzxy.edu.cn/xyzc.html" target="_blank">学校章程</a></li>
+           <li><a href="http://www.jzxy.edu.cn/xyld.html" target="_blank">学校领导</a></li>
+           <li><a href="http://www.jzxy.edu.cn/jxky.html" target="_blank">教学科研</a></li>
+           <li><a href="http://map.jzxy.edu.cn/" target="_blank">校园地图</a></li>
+         </ul>
+      </li>
+    <li class="first-nav">
+    <a href="http://www.jzxy.edu.cn/zzjg.html" target="_blank">组织机构</a>
+    <!--子循环-->
+        <ul>
+           <li><a href="http://www.jzxy.edu.cn/dzgljg.html" target="_blank">党政管理机构</a></li>
+           <li><a href="http://www.jzxy.edu.cn/jxywjg.html" target="_blank">教学业务机构</a></li>
+           <li><a href="http://www.jzxy.edu.cn/jfjg.html" target="_blank">教辅机构</a></li>
+           <li><a href="http://www.jzxy.edu.cn/qtzz.html" target="_blank">群团组织</a></li>
+         </ul>
+      </li>
+    <li class="first-nav">
+    <a href="http://www.jzxy.edu.cn/ddjs.html" target="_blank">党的建设</a>
+    <!--子循环-->
+        <ul style="overflow: hidden; display: none; height: 176px; padding-top: 0px; margin-top: 0px; padding-bottom: 0px; margin-bottom: 0px;">
+           <li><a href="http://org.jzxy.edu.cn/" target="_blank">组织工作</a></li>
+           <li><a href="http://www.jzxy.edu.cn/jczz.html" target="_blank">基层组织</a></li>
+           <li><a href="http://jjw.jzxy.edu.cn/" target="_blank">党风廉政</a></li>
+           <li><a href="http://labour.jzxy.edu.cn/" target="_blank">群团工作</a></li>
+         </ul>
+      </li>
+    <li class="first-nav">
+    <a href="https://www.jzxy.edu.cn/zysz" target="_blank">专业建设</a>
+    <!--子循环-->
+        <ul style="overflow: hidden; display: none; height: 88px; padding-top: 0px; margin-top: 0px; padding-bottom: 0px; margin-bottom: 0px;">
+           <li><a href="http://www.jzxy.edu.cn/zysz.html" target="_blank">专业设置</a></li>
+           <li><a href="https://www.jzxy.edu.cn/topic_tszy" target="_blank">特色专业</a></li>
+         </ul>
+      </li>
+    <li class="first-nav">
+    <a href="http://www.jzxy.edu.cn/kxyj.html" target="_blank">科学研究</a>
+    <!--子循环-->
+        <ul>
+           <li><a href="http://kyc.jzxy.edu.cn/" target="_blank">科研部</a></li>
+           <li><a href="http://www.jzxy.edu.cn/yjszx.html" target="_blank">研究所(中心)</a></li>
+         </ul>
+      </li>
+    <li class="first-nav">
+    <a href="http://stu.jzxy.edu.cn/" target="_blank">学生工作</a>
+    <!--子循环-->
+      </li>
+    <li class="first-nav">
+    <a href="http://portal.jzxy.edu.cn/" target="_blank">统一信息门户</a>
+    <!--子循环-->
+      </li>
+    <li class="first-nav">
+    <a href="http://office.jzxy.edu.cn/xxgk.htm" target="_blank">信息公开</a>
+    <!--子循环-->
+      </li>
+    <li class="first-nav">
+    <a href="https://jzxyzs.jzxy.edu.cn/" target="_blank">招生工作</a>
+    <!--子循环-->
+      </li>
+    <li class="first-nav">
+    <a href="https://job.jzxy.edu.cn/" target="_blank">就业工作</a>
+    <!--子循环-->
+      </li>
+  </ul>
+    </div>
+    <!--  pc搜索-->
+    <div class="search-block pointer flex-c">
+      <div class="search-block-btn flex-c">
+        <div class="search-block-icon">
+          <img src="./晋中学院_files/search_icon.png" class="img-cover">
+          <img src="./晋中学院_files/search_icon01.png" class="img-cover">
+        </div>
+      </div>
+      <div class="search-content pr">
+        <div class="mask"></div>
+        
+<script type="text/javascript">
+    function gSearch() {
+        var keyword = document.getElementById('inputkeyword').value;
+        if (keyword === '' || keyword === "请输入关键词") {
+            alert("请输入关键词");
+        } else {
+            var action_url = document.getElementById('action_url').value;
+            window.location = action_url+'/search?keywords='+keyword;
+        }
+    }
 </script>
-</body>
-</html>
+<div class="search-for pa flex">
+  <input type="hidden" id="action_url" value="http://www.jzxy.edu.cn">
+  <input type="text" class="search-for-input" placeholder="全文搜索" id="inputkeyword" name="wd" value="" spellcheck="false">
+  <div class="search-for-btn flex-c-c" id="search" onclick="gSearch();">搜索</div>
+</div>
+        <div class="search-close pa">
+          <b></b>
+          <b></b>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--  搜索移动版-->
+  <div class="search-dialog-mobile flex-c">
+    <div class="flex-c">
+      <script type="text/javascript">
+    function gSearch2() {
+        let keyword2 = document.getElementById('inputkeyword2').value;
+        if (keyword2 === "" || keyword2 === "请输入关键词") {
+            alert("请输入关键词");
+        } else {
+            var action_url = document.getElementById('action_url').value;
+            window.location = action_url+'/search?keywords='+keyword2;
+        }
+    }
+</script>
+<div class="dialog-brode flex-c">
+  <input type="hidden" id="action_url" value="http://www.jzxy.edu.cn">
+  <input type="text" class="flex-auto" placeholder="请输入关键词" id="inputkeyword2" maxlength="50" name="wd" value="">
+  <div class="dialog-icon-search flex-c-c" id="search" onclick="gSearch2();" value="搜 索">
+    <img src="./晋中学院_files/icon_search_blue.png" alt="" class="img-cover">
+  </div>
+</div>
+      <span class="icon-close-search">×</span>
+    </div>
 
+  </div>
+  <!-- 移动端导航-->
+  <div class="header-mobile">
+    <div class="flex-c mobile-inner-header">
+      <div class="image-search">
+        <img src="./晋中学院_files/icon_search_white.png" alt="" class="img-cover">
+      </div>
+      <div class=" flex-column-c-e pointer nav-icon">
+        <b></b>
+        <b class="pr"></b>
+        <b></b>
+      </div>
+    </div>
+    <div class="mobile-nav-list">
+      <div class="l-nav">
+        <div class="col-list">
+                            <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="http://www.jzxy.edu.cn/xygk.html" class="fist-nav-mobile">学校概况</a>
+                               <span class="icon-arrow" style="opacity:	1">
+                <img src="./晋中学院_files/down_icon.png" class="img-height">
+              </span>
+                            </div>
+                <!--子循环-->
+                                 <ul class="sec-nav-mobile">
+                                        <li><a href="http://www.jzxy.edu.cn/xyjj.html" target="_blank">学校简介</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/bxdw.html" target="_blank">办学定位</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/xyzc.html" target="_blank">学校章程</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/xyld.html" target="_blank">学校领导</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/jxky.html" target="_blank">教学科研</a></li>
+                                        <li><a href="http://map.jzxy.edu.cn/" target="_blank">校园地图</a></li>
+                                   </ul>
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="http://www.jzxy.edu.cn/zzjg.html" class="fist-nav-mobile">组织机构</a>
+                               <span class="icon-arrow" style="opacity:	1">
+                <img src="./晋中学院_files/down_icon.png" class="img-height">
+              </span>
+                            </div>
+                <!--子循环-->
+                                 <ul class="sec-nav-mobile">
+                                        <li><a href="http://www.jzxy.edu.cn/dzgljg.html" target="_blank">党政管理机构</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/jxywjg.html" target="_blank">教学业务机构</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/jfjg.html" target="_blank">教辅机构</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/qtzz.html" target="_blank">群团组织</a></li>
+                                   </ul>
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="http://www.jzxy.edu.cn/ddjs.html" class="fist-nav-mobile">党的建设</a>
+                               <span class="icon-arrow" style="opacity:	1">
+                <img src="./晋中学院_files/down_icon.png" class="img-height">
+              </span>
+                            </div>
+                <!--子循环-->
+                                 <ul class="sec-nav-mobile">
+                                        <li><a href="http://org.jzxy.edu.cn/" target="_blank">组织工作</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/jczz.html" target="_blank">基层组织</a></li>
+                                        <li><a href="http://jjw.jzxy.edu.cn/" target="_blank">党风廉政</a></li>
+                                        <li><a href="http://labour.jzxy.edu.cn/" target="_blank">群团工作</a></li>
+                                   </ul>
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="https://www.jzxy.edu.cn/zysz" class="fist-nav-mobile">专业建设</a>
+                               <span class="icon-arrow" style="opacity:	1">
+                <img src="./晋中学院_files/down_icon.png" class="img-height">
+              </span>
+                            </div>
+                <!--子循环-->
+                                 <ul class="sec-nav-mobile">
+                                        <li><a href="http://www.jzxy.edu.cn/zysz.html" target="_blank">专业设置</a></li>
+                                        <li><a href="https://www.jzxy.edu.cn/topic_tszy" target="_blank">特色专业</a></li>
+                                   </ul>
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="http://www.jzxy.edu.cn/kxyj.html" class="fist-nav-mobile">科学研究</a>
+                               <span class="icon-arrow" style="opacity:	1">
+                <img src="./晋中学院_files/down_icon.png" class="img-height">
+              </span>
+                            </div>
+                <!--子循环-->
+                                 <ul class="sec-nav-mobile">
+                                        <li><a href="http://kyc.jzxy.edu.cn/" target="_blank">科研部</a></li>
+                                        <li><a href="http://www.jzxy.edu.cn/yjszx.html" target="_blank">研究所(中心)</a></li>
+                                   </ul>
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="http://stu.jzxy.edu.cn/" class="fist-nav-mobile">学生工作</a>
+                           </div>
+                <!--子循环-->
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="http://portal.jzxy.edu.cn/" class="fist-nav-mobile">统一信息门户</a>
+                           </div>
+                <!--子循环-->
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="http://office.jzxy.edu.cn/xxgk.htm" class="fist-nav-mobile">信息公开</a>
+                           </div>
+                <!--子循环-->
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="https://jzxyzs.jzxy.edu.cn/" class="fist-nav-mobile">招生工作</a>
+                           </div>
+                <!--子循环-->
+                          </div>
+                 <div class="t t-nav-list">
+            <div class="flex-c-sb fist-nav-box">
+              <a href="https://job.jzxy.edu.cn/" class="fist-nav-mobile">就业工作</a>
+                           </div>
+                <!--子循环-->
+                          </div>
+                       
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript">
+//     导航滚动动效
+    document.onmousewheel = function () {
+      let scrollTop = document.documentElement.scrollTop;
+      if(scrollTop>0){
+        $('.header-block').addClass('header-block-blue')
+      }else{
+        $('.header-block').removeClass('header-block-blue')
+      }
+    }
+    // PC导航鼠标滑过效果
+    $('.first-nav').hover(function(){
+      let len = $(this).find('li').length;
+      if(len>0){
+        $(this).children('ul').stop().slideDown()
+        $(this).addClass('on')
+      }
+    },function(){
+      let len = $(this).find('li').length;
+      $('.first-nav ul').removeClass('bg-shadow')
+      if(len>0){
+        $(this).children('ul').stop().slideUp()
+        $(this).removeClass('on')
+      }
+    })
+    //pc点击搜索
+    $('.search-block-btn').click(function (){
+      $('.search-content').stop().fadeIn();
+    })
+    $(".search-close").click(function (){
+      $('.search-content').stop().fadeOut();
+    })
+    //移动点击导航icon
+    $('.mobile-inner-header .nav-icon').click(function (){
+      if($(this).hasClass('open')){
+        $('.mobile-inner-header .nav-icon').removeClass('open')
+      }else{
+        $('.mobile-inner-header .nav-icon').addClass('open')
+      }
+      $('.header-mobile .mobile-nav-list').stop().slideToggle()
+    })
+    //移动点击菜单切换
+    $('.mobile-nav-list .icon-arrow').click(function (){
+      if($(this).hasClass('mobile-nav-list-openicon')){
+        $(this).removeClass('mobile-nav-list-openicon')
+      }else{
+        $(this).addClass('mobile-nav-list-openicon')
+      }
+      $(this).parent().siblings('.sec-nav-mobile').stop().slideToggle()
+    })
+    //移动点击搜索
+    $('.mobile-inner-header .image-search').click(function (){
+      $('.search-dialog-mobile').stop().slideDown();
+    })
+    $('.search-dialog-mobile .icon-close-search').click(function (){
+      $('.search-dialog-mobile').stop().slideUp();
+    })
+  </script>
+</div>
+
+<!--首屏轮播图-->
+<div class="bg-swiper">
+    <div class="banner-swiper pr swiper-container-initialized swiper-container-horizontal">
+        <div class="swiper-wrapper" style="transition-duration: 0ms; transform: translate3d(-4290px, 0px, 0px);"><div class="swiper-slide swiper-slide-duplicate" data-swiper-slide-index="9" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_100439.html" class="banner-img">
+        <img src="./晋中学院_files/69a14b075574a.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div>
+                 <div class="swiper-slide" data-swiper-slide-index="0" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_103502.html" class="banner-img">
+        <img src="./晋中学院_files/6aa7f1a5d5cec.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide swiper-slide-prev" data-swiper-slide-index="1" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_103464.html" class="banner-img">
+        <img src="./晋中学院_files/6aa28ea00dc2b.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide swiper-slide-active" data-swiper-slide-index="2" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_103393.html" class="banner-img">
+        <img src="./晋中学院_files/6a9e7ef24330f.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide swiper-slide-next" data-swiper-slide-index="3" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_103312.html" class="banner-img">
+        <img src="./晋中学院_files/6a99704d8d1e5.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide" data-swiper-slide-index="4" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_102890.html" class="banner-img">
+        <img src="./晋中学院_files/6a44a13f855d9.png" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide" data-swiper-slide-index="5" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_102858.html" class="banner-img">
+        <img src="./晋中学院_files/6a3ea0d618eac.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide" data-swiper-slide-index="6" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_102391.html" class="banner-img">
+        <img src="./晋中学院_files/6a313969de000.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide" data-swiper-slide-index="7" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_102390.html" class="banner-img">
+        <img src="./晋中学院_files/6a31384a65250.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide" data-swiper-slide-index="8" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_102389.html" class="banner-img">
+        <img src="./晋中学院_files/6a313495183d4.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	  <div class="swiper-slide" data-swiper-slide-index="9" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_100439.html" class="banner-img">
+        <img src="./晋中学院_files/69a14b075574a.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div> 
+	        <div class="swiper-slide swiper-slide-duplicate" data-swiper-slide-index="0" style="width: 1430px;">
+    <div class="swiper-slide-banner">
+      <a href="http://www.jzxy.edu.cn/sylb/content_103502.html" class="banner-img">
+        <img src="./晋中学院_files/6aa7f1a5d5cec.jpg" alt="" class="img-cover">
+      </a>
+    </div>
+</div></div>
+        <div class="swiper-button-prev pa" tabindex="0" role="button" aria-label="Previous slide"></div>
+        <div class="swiper-button-next pa" tabindex="0" role="button" aria-label="Next slide"></div>
+        <div class="banner-pagination pa swiper-pagination-clickable swiper-pagination-bullets"><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 1"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 2"></span><span class="swiper-pagination-bullet swiper-pagination-bullet-active" tabindex="0" role="button" aria-label="Go to slide 3"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 4"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 5"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 6"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 7"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 8"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 9"></span><span class="swiper-pagination-bullet" tabindex="0" role="button" aria-label="Go to slide 10"></span></div>
+        <script type="text/javascript">
+            //   首屏轮播图
+            let bannerSwiper = new Swiper(".banner-swiper", {
+                loop: true,
+                autoplay: {
+                  disableOnInteraction: false,
+                  delay: 6000,//1秒切换一次
+                },
+                navigation: {
+                    nextEl: ".banner-swiper .swiper-button-next",
+                    prevEl: ".banner-swiper .swiper-button-prev",
+                },
+                pagination: {
+                  el: ".banner-swiper .banner-pagination",
+                  clickable:true,
+                },
+            });
+
+        </script><span class="swiper-notification" aria-live="assertive" aria-atomic="true"></span>
+    </div>
+</div>
+  
+  
+                                                 
+
+<!--正式内容-->
+<div class="bg-content">
+  <!--学院要闻-->
+  <div class="news-block">
+    <div class="page-center">
+      <div class="index-title flex-c-c wow fadeInUp animated" data-wow-delay="0.1s" style="visibility: hidden; animation-delay: 0.1s; animation-name: inherit;">
+        <div class="title-icon1 flex-c-c pr">
+          <div class="title-icon-img">
+            <img class="img-cover" src="./晋中学院_files/title_icon.png" alt="">
+          </div>
+          <div class="title-circle pa">
+            <div class="circle-small pa"></div>
+          </div>
+        </div>
+        <div class="title-bold pr">
+          <p class="pr title-text">学院要闻</p>
+        </div>
+        <a href="https://www.jzxy.edu.cn/xwdt" target="_blank" class="title-icon2 index-more"><img class="img-scale" src="./晋中学院_files/title-arrow.png" alt=""></a>
+      </div>
+      <div class="flex-c-e index-more-block wow fadeInUp animated" data-wow-delay="0.1s" style="visibility: hidden; animation-delay: 0.1s; animation-name: inherit;">
+        <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/xwdt" target="_blank">
+          <div class="more-icon"></div>更多
+        </a>
+      </div>
+      <div class="news-main   wow fadeInUp animated" data-wow-delay="0.5s" style="visibility: hidden; animation-delay: 0.5s; animation-name: inherit;">
+        <div class="news_box">
+    <div class="news-main flex-wrap wow fadeInUp animated" data-wow-delay="0.5s" style="visibility: hidden; animation-delay: 0.5s; animation-name: inherit;">
+        <a href="http://www.jzxy.edu.cn/xwdt/content_103500.html" target="_blank" class="news-top-right-list pr">
+      <div class="top-img"><img class="img-cover" src="./晋中学院_files/6aa7e50e362bd.jpg" alt=""></div>
+      <div class="top-info pa flex-c-sb">
+        <div class="flex-c top-info-time flex-column-c-c">
+          <div class="top-info-time-dady">14</div>
+          <div class="top-info-time-yearmonth">2026-09</div>
+        </div>
+        <div class="info-tt ellipsis_1">学院举行2026级新生开学典礼暨军训动员大会</div>
+      </div>
+    </a>
+        <a href="http://www.jzxy.edu.cn/xwdt/content_103487.html" target="_blank" class="news-top-right-list pr">
+      <div class="top-img"><img class="img-cover" src="./晋中学院_files/6aa571c909ab8.jpg" alt=""></div>
+      <div class="top-info pa flex-c-sb">
+        <div class="flex-c top-info-time flex-column-c-c">
+          <div class="top-info-time-dady">12</div>
+          <div class="top-info-time-yearmonth">2026-09</div>
+        </div>
+        <div class="info-tt ellipsis_1">学院喜迎2026级新生入学报到</div>
+      </div>
+    </a>
+        <a href="http://www.jzxy.edu.cn/xwdt/content_103463.html" target="_blank" class="news-top-right-list pr">
+      <div class="top-img"><img class="img-cover" src="./晋中学院_files/6aa28b173c49d.jpg" alt=""></div>
+      <div class="top-info pa flex-c-sb">
+        <div class="flex-c top-info-time flex-column-c-c">
+          <div class="top-info-time-dady">10</div>
+          <div class="top-info-time-yearmonth">2026-09</div>
+        </div>
+        <div class="info-tt ellipsis_1">学院举行庆祝第42个教师节暨表彰大会</div>
+      </div>
+    </a>
+        <a href="http://www.jzxy.edu.cn/xwdt/content_103452.html" target="_blank" class="news-top-right-list pr">
+      <div class="top-img"><img class="img-cover" src="./晋中学院_files/6aa1573b74c3e.jpg" alt=""></div>
+      <div class="top-info pa flex-c-sb">
+        <div class="flex-c top-info-time flex-column-c-c">
+          <div class="top-info-time-dady">09</div>
+          <div class="top-info-time-yearmonth">2026-09</div>
+        </div>
+        <div class="info-tt ellipsis_1">党委书记张长青带队赴实验学校开展教师节慰问调研</div>
+      </div>
+    </a>
+        <a href="http://www.jzxy.edu.cn/xwdt/content_103451.html" target="_blank" class="news-top-right-list pr">
+      <div class="top-img"><img class="img-cover" src="./晋中学院_files/6aa1524e0dfa4.jpg" alt=""></div>
+      <div class="top-info pa flex-c-sb">
+        <div class="flex-c top-info-time flex-column-c-c">
+          <div class="top-info-time-dady">09</div>
+          <div class="top-info-time-yearmonth">2026-09</div>
+        </div>
+        <div class="info-tt ellipsis_1">学院召开庆祝第42个教师节教师代表座谈会</div>
+      </div>
+    </a>
+        <a href="http://www.jzxy.edu.cn/xwdt/content_103439.html" target="_blank" class="news-top-right-list pr">
+      <div class="top-img"><img class="img-cover" src="./晋中学院_files/6aa0105d6b1df.jpg" alt=""></div>
+      <div class="top-info pa flex-c-sb">
+        <div class="flex-c top-info-time flex-column-c-c">
+          <div class="top-info-time-dady">08</div>
+          <div class="top-info-time-yearmonth">2026-09</div>
+        </div>
+        <div class="info-tt ellipsis_1">我院与太原科技大学签署硕士研究生联合培养协议</div>
+      </div>
+    </a>
+      </div>
+    <!--文章列表-->
+    <div class="news-card flex-wrap wow fadeInUp animated" data-wow-delay="0.6s" style="visibility: hidden; animation-delay: 0.6s; animation-name: inherit;">
+        <a class="card-item" href="http://www.jzxy.edu.cn/xwdt/content_103437.html" target="_blank">
+      <div class="item-tt ellipsis_1"> 院党委理论学习中心组（扩大）学习会召开</div>
+      <div class="item-intro ellipsis_2" title=""></div>
+      <div class="date-box flex-c">
+        <div class="day flex-c-c">08</div>
+        <div class="year-month flex-c-c">2026-09</div>
+      </div>
+    </a>
+        <a class="card-item" href="http://www.jzxy.edu.cn/xwdt/content_103336.html" target="_blank">
+      <div class="item-tt ellipsis_1"> 三届党委第八轮巡察完成反馈</div>
+      <div class="item-intro ellipsis_2" title=""></div>
+      <div class="date-box flex-c">
+        <div class="day flex-c-c">04</div>
+        <div class="year-month flex-c-c">2026-09</div>
+      </div>
+    </a>
+        <a class="card-item" href="http://www.jzxy.edu.cn/xwdt/content_103276.html" target="_blank">
+      <div class="item-tt ellipsis_1"> 学院举行2026年秋季学期升国旗仪式</div>
+      <div class="item-intro ellipsis_2" title=""></div>
+      <div class="date-box flex-c">
+        <div class="day flex-c-c">31</div>
+        <div class="year-month flex-c-c">2026-08</div>
+      </div>
+    </a>
+        
+  </div>
+  
+</div>
+
+
+
+      </div>
+    </div>
+    <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+      <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/xwdt" target="_blank">
+        <div class="more-icon"></div>更多
+      </a>
+    </div>
+  </div>
+  <!--学院教学/科研-->
+  <div class="teach-esearch-block">
+    <div class="page-center flex">
+      <!--教学-->
+      <div class="teach-block flex">
+        <div class="teach-block-left flex-column-c-sb wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+          <div class="teach-block-left-title index-title index-title-white flex-column-c">
+              <div class="title-icon1 title-icon1-white flex-c-c pr">
+                <div class="title-icon-img">
+                  <img class="img-cover" src="./晋中学院_files/title_icon02.png" alt="">
+                </div>
+                <div class="title-circle pa">
+                  <div class="circle-small pa"></div>
+                </div>
+              </div>
+              <div class="title-bold pr">
+                <p class="pr title-text">学院教学</p>
+              </div>
+              <a href="https://www.jzxy.edu.cn/cgzs" target="_blank" class="title-icon2 index-more"><img class="img-scale" src="./晋中学院_files/title-arrow02.png" alt=""></a>
+          </div>
+          <div class="flex-column index-more-block teach-block-left-more">
+            <a class="index-more index-more-white pointer flex-column-c-c" href="https://www.jzxy.edu.cn/cgzs" target="_blank">
+              <div class="more-icon"></div><p>更</p><p>多</p>
+            </a>
+          </div>
+        </div>
+        <div class="teach-block-right flex-wrap wow fadeInUp" data-wow-delay="0.4s" style="visibility: hidden; animation-delay: 0.4s; animation-name: inherit;">
+             <a class="teach-block-right-list pr flex-column" href="http://www.jzxy.edu.cn/cgzs/content_103539.html" target="_blank">
+  <div class="teach-blockright-list-time pr flex-c-c">2026-09-16</div>
+  <div class="teach-blockright-list-text ellipsis_2">我院举行2026年新入职教师培训暨高层次人才研修班开班仪式</div>
+  <div class="flex-c teach-blockright-list-view">
+    <div class="teach-item-title">详情</div>
+    <div class="teach-item-arrow"></div>
+  </div>
+  <div class="teach-block-right-list-circle pa flex-c-c"></div>
+  </a>
+    <a class="teach-block-right-list pr flex-column" href="http://www.jzxy.edu.cn/cgzs/content_103440.html" target="_blank">
+  <div class="teach-blockright-list-time pr flex-c-c">2026-09-08</div>
+  <div class="teach-blockright-list-text ellipsis_2">锚定高质量发展 锻造应用型标杆——学院召开2026-2027学年秋季学…</div>
+  <div class="flex-c teach-blockright-list-view">
+    <div class="teach-item-title">详情</div>
+    <div class="teach-item-arrow"></div>
+  </div>
+  <div class="teach-block-right-list-circle pa flex-c-c"></div>
+  </a>
+    <a class="teach-block-right-list pr flex-column" href="http://www.jzxy.edu.cn/cgzs/content_103029.html" target="_blank">
+  <div class="teach-blockright-list-time pr flex-c-c">2026-07-03</div>
+  <div class="teach-blockright-list-text ellipsis_2">我院召开公共课教学改革推进会</div>
+  <div class="flex-c teach-blockright-list-view">
+    <div class="teach-item-title">详情</div>
+    <div class="teach-item-arrow"></div>
+  </div>
+  <div class="teach-block-right-list-circle pa flex-c-c"></div>
+  </a>
+    <a class="teach-block-right-list pr flex-column" href="http://www.jzxy.edu.cn/xwdt/content_102375.html" target="_blank">
+  <div class="teach-blockright-list-time pr flex-c-c">2026-06-16</div>
+  <div class="teach-blockright-list-text ellipsis_2">学院第三届“数融创意，智展风采”网媒、新闻专业课程作业及毕业…</div>
+  <div class="flex-c teach-blockright-list-view">
+    <div class="teach-item-title">详情</div>
+    <div class="teach-item-arrow"></div>
+  </div>
+  <div class="teach-block-right-list-circle pa flex-c-c"></div>
+  </a>
+            </div>
+        <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+          <a class="index-more index-more-white pointer flex-c" href="https://www.jzxy.edu.cn/cgzs" target="_blank">
+            <div class="more-icon"></div>更多
+          </a>
+        </div>
+      </div>
+      <!--科研-->
+      <div class="esearch-block flex-column-c">
+        <div class="index-title index-title-white flex-c-c wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+          <div class="title-icon1 title-icon1-white flex-c-c pr">
+            <div class="title-icon-img">
+              <img class="img-cover" src="./晋中学院_files/title_icon02.png" alt="">
+            </div>
+            <div class="title-circle pa">
+              <div class="circle-small pa"></div>
+            </div>
+          </div>
+          <div class="title-bold pr">
+            <p class="pr title-text">学院科研</p>
+          </div>
+          <a href="https://www.jzxy.edu.cn/jyky" target="_blank" class="title-icon2 index-more"><img class="img-scale" src="./晋中学院_files/title-arrow02.png" alt=""></a>
+        </div>
+        <div class="flex-c-e index-more-block wow fadeInUp" style="margin-top: -0.2rem; visibility: hidden; animation-name: inherit;">
+          <a class="index-more index-more-white pointer flex-c" href="https://www.jzxy.edu.cn/jyky" target="_blank">
+            <div class="more-icon"></div>更多
+          </a>
+        </div>
+        <div class="esearch-block-content flex-column-c wow fadeInUp" data-wow-delay="0.6s" style="visibility: hidden; animation-delay: 0.6s; animation-name: inherit;">
+             <a class="esearch-block-content-list pr flex-c-c" href="http://www.jzxy.edu.cn/jyky/content_103546.html" target="_blank">
+  <div class="time flex-column-c-c">
+    <div class="day">17</div>
+    <div class="year-month">2026-09</div>
+  </div>
+  <div class="time time-center flex-column-c-c">
+    <div class="day">17</div>
+    <div class="year-month">2026-09</div>
+  </div>
+  <div class="line"></div>
+  <div class="list-title flex">
+    <div class="ellipsis_1">
+     王川龙教授应邀来我院作专题讲座    </div>
+  </div>
+  <div class="column-line"></div>
+  <div class="intro-text ellipsis_3"></div>
+  <div class="circle pa"></div>
+</a>
+    <a class="esearch-block-content-list pr flex-c-c" href="http://www.jzxy.edu.cn/xwdt/content_103250.html" target="_blank">
+  <div class="time flex-column-c-c">
+    <div class="day">27</div>
+    <div class="year-month">2026-08</div>
+  </div>
+  <div class="time time-center flex-column-c-c">
+    <div class="day">27</div>
+    <div class="year-month">2026-08</div>
+  </div>
+  <div class="line"></div>
+  <div class="list-title flex">
+    <div class="ellipsis_1">
+     我院获批2项国家自然科学基金项目    </div>
+  </div>
+  <div class="column-line"></div>
+  <div class="intro-text ellipsis_3"></div>
+  <div class="circle pa"></div>
+</a>
+    <a class="esearch-block-content-list pr flex-c-c" href="http://www.jzxy.edu.cn/jyky/content_103027.html" target="_blank">
+  <div class="time flex-column-c-c">
+    <div class="day">15</div>
+    <div class="year-month">2026-07</div>
+  </div>
+  <div class="time time-center flex-column-c-c">
+    <div class="day">15</div>
+    <div class="year-month">2026-07</div>
+  </div>
+  <div class="line"></div>
+  <div class="list-title flex">
+    <div class="ellipsis_1">
+     我院教师杨嘉伟专著由商务印书馆正式出版    </div>
+  </div>
+  <div class="column-line"></div>
+  <div class="intro-text ellipsis_3"></div>
+  <div class="circle pa"></div>
+</a>
+    <a class="esearch-block-content-list pr flex-c-c" href="http://www.jzxy.edu.cn/jyky/content_103016.html" target="_blank">
+  <div class="time flex-column-c-c">
+    <div class="day">14</div>
+    <div class="year-month">2026-07</div>
+  </div>
+  <div class="time time-center flex-column-c-c">
+    <div class="day">14</div>
+    <div class="year-month">2026-07</div>
+  </div>
+  <div class="line"></div>
+  <div class="list-title flex">
+    <div class="ellipsis_1">
+     学院召开2026年度技术创新团队培育基金项目评审会    </div>
+  </div>
+  <div class="column-line"></div>
+  <div class="intro-text ellipsis_3"></div>
+  <div class="circle pa"></div>
+</a>
+    <a class="esearch-block-content-list pr flex-c-c" href="http://www.jzxy.edu.cn/jyky/content_103015.html" target="_blank">
+  <div class="time flex-column-c-c">
+    <div class="day">13</div>
+    <div class="year-month">2026-07</div>
+  </div>
+  <div class="time time-center flex-column-c-c">
+    <div class="day">13</div>
+    <div class="year-month">2026-07</div>
+  </div>
+  <div class="line"></div>
+  <div class="list-title flex">
+    <div class="ellipsis_1">
+     我院召开2026年科研诚信警示教育会    </div>
+  </div>
+  <div class="column-line"></div>
+  <div class="intro-text ellipsis_3"></div>
+  <div class="circle pa"></div>
+</a>
+            </div>
+        <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+          <a class="index-more index-more-white pointer flex-c" href="https://www.jzxy.edu.cn/jyky" target="_blank">
+            <div class="more-icon"></div>更多
+          </a>
+        </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    
+  <script type="text/javascript">
+    let widWith = $(window).width();
+    $(window).resize(function(){
+      widWith = $(window).width();
+    })
+    $(".esearch-block-content-list").hover(function(){
+      $(this).addClass('current-list');
+      if (widWith >769){
+        $(this).siblings('.esearch-block-content-list').removeClass('current-list');
+      }
+    })
+    if (widWith <769){
+      $('.esearch-block-content-list').addClass('current-list')
+    }
+    $(window).resize(function(){
+      if( $(window).width() < 769){
+        $('.esearch-block-content-list').addClass('current-list')
+      }else{
+        $('.esearch-block-content-list').removeClass('current-list')
+      }
+    });
+  </script>
+  
+  <!--学术动态-->
+  <div class="sciencedata-block">
+    <div class="page-center">
+      <div class="index-title flex-c-c wow fadeInUp animated" data-wow-delay="0.1s" style="visibility: hidden; animation-delay: 0.1s; animation-name: inherit;">
+        <div class="title-icon1 flex-c-c pr">
+          <div class="title-icon-img">
+            <img class="img-cover" src="./晋中学院_files/title_icon.png" alt="">
+          </div>
+          <div class="title-circle pa">
+            <div class="circle-small pa"></div>
+          </div>
+        </div>
+        <div class="title-bold pr">
+          <p class="pr title-text">学术动态</p>
+        </div>
+        <a href="https://www.jzxy.edu.cn/xsjz" target="_blank" class="title-icon2 index-more"><img class="img-scale" src="./晋中学院_files/title-arrow.png" alt=""></a>
+      </div>
+      <div class="flex-c-e index-more-block wow fadeInUp animated" data-wow-delay="0.1s" style="visibility: hidden; animation-delay: 0.1s; animation-name: inherit;">
+        <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/xsjz" target="_blank">
+          <div class="more-icon"></div>更多
+        </a>
+      </div>
+      <div class="sciencedata-con-top flex wow fadeInUp animated" data-wow-delay="0.5s" style="visibility: hidden; animation-delay: 0.5s; animation-name: inherit;">
+        <div class="sciencedata-con-top-left">
+          <div class="sciencedata-con-top-swipercard pr swiper-container-initialized swiper-container-horizontal">
+            <div class="swiper-wrapper" style="transition-duration: 0ms; transform: translate3d(-2070px, 0px, 0px);"><div class="swiper-slide swiper-slide-duplicate" data-swiper-slide-index="4" style="width: 690px;">
+  <div class="swiper-slide-banner">
+    <a href="http://www.jzxy.edu.cn/xwdt/content_2686.html" target="_blank" class="banner-block-img">
+      <img class="img-cover" src="./晋中学院_files/63ff07e763d5e.jpg" alt="">
+    </a>
+  </div>
+</div>
+						   <div class="swiper-slide" data-swiper-slide-index="0" style="width: 690px;">
+  <div class="swiper-slide-banner">
+    <a href="http://www.jzxy.edu.cn/xwdt/content_102188.html" target="_blank" class="banner-block-img">
+      <img class="img-cover" src="./晋中学院_files/6a2171ac309a3.jpg" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide swiper-slide-prev" data-swiper-slide-index="1" style="width: 690px;">
+  <div class="swiper-slide-banner">
+    <a href="http://www.jzxy.edu.cn/xwdt/content_102158.html" target="_blank" class="banner-block-img">
+      <img class="img-cover" src="./晋中学院_files/6a2031053869d.jpg" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide swiper-slide-active" data-swiper-slide-index="2" style="width: 690px;">
+  <div class="swiper-slide-banner">
+    <a href="http://www.jzxy.edu.cn/xwdt/content_98158.html" target="_blank" class="banner-block-img">
+      <img class="img-cover" src="./晋中学院_files/6901a93e82f9c.jpg" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide swiper-slide-next" data-swiper-slide-index="3" style="width: 690px;">
+  <div class="swiper-slide-banner">
+    <a href="http://www.jzxy.edu.cn/jyky/content_98056.html" target="_blank" class="banner-block-img">
+      <img class="img-cover" src="./晋中学院_files/68ff796dbc072.jpg" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide" data-swiper-slide-index="4" style="width: 690px;">
+  <div class="swiper-slide-banner">
+    <a href="http://www.jzxy.edu.cn/xwdt/content_2686.html" target="_blank" class="banner-block-img">
+      <img class="img-cover" src="./晋中学院_files/63ff07e763d5e.jpg" alt="">
+    </a>
+  </div>
+</div>
+                <div class="swiper-slide swiper-slide-duplicate" data-swiper-slide-index="0" style="width: 690px;">
+  <div class="swiper-slide-banner">
+    <a href="http://www.jzxy.edu.cn/xwdt/content_102188.html" target="_blank" class="banner-block-img">
+      <img class="img-cover" src="./晋中学院_files/6a2171ac309a3.jpg" alt="">
+    </a>
+  </div>
+</div></div>
+            <div class="banner-pagination pa flex-c-c swiper-pagination-bullets"><span class="swiper-pagination-bullet"></span><span class="swiper-pagination-bullet"></span><span class="swiper-pagination-bullet swiper-pagination-bullet-active"></span><span class="swiper-pagination-bullet"></span><span class="swiper-pagination-bullet"></span></div>
+          <span class="swiper-notification" aria-live="assertive" aria-atomic="true"></span></div>
+        </div>
+        <div class="sciencedata-con-top-right">
+             <a class="sciencedata-con-topright-list pr" href="https://www.jzxy.edu.cn/jyky/content_103546.html" target="_blank">
+  <div class="title ellipsis_1">王川龙教授应邀来我院作专题讲座</div>
+  <div class="info ellipsis_2"></div>
+  <div class="time flex-c-c pa">2026-09-17 </div>
+</a>
+    <a class="sciencedata-con-topright-list pr" href="http://www.jzxy.edu.cn/xwdt/content_102188.html" target="_blank">
+  <div class="title ellipsis_1">“音舞传薪·美育共融——大中小学美育一体化学术活动月”开幕式…</div>
+  <div class="info ellipsis_2"></div>
+  <div class="time flex-c-c pa">2026-06-04 </div>
+</a>
+    <a class="sciencedata-con-topright-list pr" href="http://www.jzxy.edu.cn/xwdt/content_102158.html" target="_blank">
+  <div class="title ellipsis_1">曲阜师范大学陈培站教授来我院作专题讲座</div>
+  <div class="info ellipsis_2"></div>
+  <div class="time flex-c-c pa">2026-05-29 </div>
+</a>
+            </div>
+      </div>
+      <div class="sciencedata-con-bottom pr flex-column wow fadeInUp swiper-container-initialized swiper-container-horizontal animated" data-wow-delay="0.6s" style="visibility: hidden; animation-delay: 0.6s; animation-name: inherit;">
+        <div class="swiper-wrapper" style="transition-duration: 0ms; transform: translate3d(-2145px, 0px, 0px);"><div class="swiper-slide flex-column pr swiper-slide-duplicate swiper-slide-duplicate-next" data-swiper-slide-index="3" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xsjz/content_94189.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">山西大学郭虎升教授来学院作学术报告</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div><div class="swiper-slide flex-column pr swiper-slide-duplicate" data-swiper-slide-index="4" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xsjz/content_94188.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">马来西亚理科大学Debbita教授来访我校并进行学术交流</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div><div class="swiper-slide flex-column pr swiper-slide-duplicate" data-swiper-slide-index="5" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xsjz/content_94187.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">外语系特邀安徽宿州学院张雁凌教授做《揭开国社科的面纱——中华…</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div>
+              
+	<div class="swiper-slide flex-column pr" data-swiper-slide-index="0" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xwdt/content_98158.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">我院举办“学院大讲堂”第十六期暨“以教育家精神铸魂育人”专题…</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div>
+ 
+	<div class="swiper-slide flex-column pr swiper-slide-prev" data-swiper-slide-index="1" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/jyky/content_98056.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">科研部组织召开“科研经费规范使用与高效管理” 专题培训会</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div>
+ 
+	<div class="swiper-slide flex-column pr swiper-slide-active" data-swiper-slide-index="2" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xwdt/content_97611.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">学院举办“非遗美育大中小一体化协同育人”论坛</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div>
+ 
+	<div class="swiper-slide flex-column pr swiper-slide-next" data-swiper-slide-index="3" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xsjz/content_94189.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">山西大学郭虎升教授来学院作学术报告</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div>
+ 
+	<div class="swiper-slide flex-column pr" data-swiper-slide-index="4" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xsjz/content_94188.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">马来西亚理科大学Debbita教授来访我校并进行学术交流</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div>
+ 
+	<div class="swiper-slide flex-column pr" data-swiper-slide-index="5" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xsjz/content_94187.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">外语系特邀安徽宿州学院张雁凌教授做《揭开国社科的面纱——中华…</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div>
+ 
+        <div class="swiper-slide flex-column pr swiper-slide-duplicate" data-swiper-slide-index="0" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xwdt/content_98158.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">我院举办“学院大讲堂”第十六期暨“以教育家精神铸魂育人”专题…</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div><div class="swiper-slide flex-column pr swiper-slide-duplicate swiper-slide-duplicate-prev" data-swiper-slide-index="1" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/jyky/content_98056.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">科研部组织召开“科研经费规范使用与高效管理” 专题培训会</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div><div class="swiper-slide flex-column pr swiper-slide-duplicate swiper-slide-duplicate-active" data-swiper-slide-index="2" style="width: 429px;">
+  <div class="sciencedata-conbottom-slide-top">
+    <div class="sciencedata-dwiper-circle flex-c-c pr">
+      <div class="sciencedata-dwiper-circle-img"></div>
+    </div>
+  </div>
+  <a class="sciencedata-conbottom-slide-bottom pr flex-c" href="http://www.jzxy.edu.cn/xwdt/content_97611.html" target="_blank">
+    <div class="slide-bottom-text flex-column">
+      <div class="slide-bottom-title ellipsis_1">学院举办“非遗美育大中小一体化协同育人”论坛</div>
+      <div class="slide-bottom-info ellipsis_1"></div>
+    </div>
+    <div class="slide-bottom-arrow"></div>
+  </a>
+</div></div>
+        <div class="sciencedata-swiper-prev pa pointer" tabindex="0" role="button" aria-label="Previous slide"></div>
+        <div class="sciencedata-swiper-next pa pointer" tabindex="0" role="button" aria-label="Next slide"></div>
+      <span class="swiper-notification" aria-live="assertive" aria-atomic="true"></span></div>
+    </div>
+
+    <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+      <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/xsjz" target="_blank">
+        <div class="more-icon"></div>更多
+      </a>
+    </div>
+    <script type="text/javascript">
+      let windowWith = $(window).width();
+      //学术动态
+      let sciencedataTopSwiper = new Swiper(".sciencedata-con-top-swipercard", {
+        loop: true,
+        autoplay: {
+          delay: 4000,
+        },
+        pagination: {
+          el: ".sciencedata-con-top-swipercard .banner-pagination",
+        },
+      });
+
+      new Swiper(".sciencedata-con-bottom", {
+        loop: true,
+        spaceBetween:0,
+        autoplay: {
+          delay: 6000,
+        },
+        slidesPerView: windowWith >= 768 ? 3 : windowWith >= 640 ? 2 :1 ,
+        navigation: {
+          nextEl: ".sciencedata-swiper-next",
+          prevEl: ".sciencedata-swiper-prev",
+        },
+      });
+      $(window).resize(function(){
+        if( $(window).width() < 769){
+          new Swiper(".sciencedata-con-bottom", {
+            loop: true,
+            spaceBetween:0,
+            autoplay: {
+              delay: 6000,
+            },
+            slidesPerView: $(window).width()>768 ? 3 :1 ,
+            navigation: {
+              nextEl: ".sciencedata-swiper-next",
+              prevEl: ".sciencedata-swiper-prev",
+            },
+          });
+        }
+      });
+    </script>
+
+  </div>
+  <!--专题专栏-->
+  <div class="ztzl-block">
+    <div class="page-center">
+      <div class="index-title flex-c-c wow fadeInUp animated" data-wow-delay="0.1s" style="visibility: hidden; animation-delay: 0.1s; animation-name: inherit;">
+        <div class="title-icon1 flex-c-c pr">
+          <div class="title-icon-img">
+            <img class="img-cover" src="./晋中学院_files/title_icon.png" alt="">
+          </div>
+          <div class="title-circle pa">
+            <div class="circle-small pa"></div>
+          </div>
+        </div>
+        <div class="title-bold pr">
+          <p class="pr title-text">专题专栏</p>
+        </div>
+        <a href="https://www.jzxy.edu.cn/ztzl" target="_blank" class="title-icon2 index-more"><img class="img-scale" src="./晋中学院_files/title-arrow.png" alt=""></a>
+      </div>
+      <div class="flex-c-e index-more-block wow fadeInUp animated" data-wow-delay="0.1s" style="visibility: hidden; animation-delay: 0.1s; animation-name: inherit;">
+        <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/ztzl" target="_blank">
+          <div class="more-icon"></div>更多
+        </a>
+      </div>
+      <!-- pc端专题专栏 -->
+      <div class="ztzl-card flex-wrap  wow fadeInUp animated" data-wow-delay="0.5s" style="visibility: hidden; animation-delay: 0.5s; animation-name: inherit;">
+           <a href="https://www.jzxy.edu.cn/esjszqh.html" target="_blank" class="card-item">
+  <img class="img-width" src="./晋中学院_files/69294e19cb547.jpg" alt="">
+</a>
+    <a href="http://www.sxdygbjy.gov.cn//ztzl/zybxgdxxjy/index.html" target="_blank" class="card-item">
+  <img class="img-width" src="./晋中学院_files/67e9ee584f6b0.png" alt="">
+</a>
+    <a href="https://www.12371.cn/special/20jszqh/" target="_blank" class="card-item">
+  <img class="img-width" src="./晋中学院_files/66ac6c0d9ec50.jpg" alt="">
+</a>
+    <a href="http://jwc.jzxy.edu.cn/bkjyjxshpgw.html" target="_blank" class="card-item">
+  <img class="img-width" src="./晋中学院_files/6629fc4263f56.jpg" alt="">
+</a>
+    <a href="http://www.sxdi.gov.cn/qfjy2/jgjf/index.html" target="_blank" class="card-item">
+  <img class="img-width" src="./晋中学院_files/653fa5eb2782a.png" alt="">
+</a>
+    <a href="http://fysj.jzxy.edu.cn/" target="_blank" class="card-item">
+  <img class="img-width" src="./晋中学院_files/653fa60e08290.png" alt="">
+</a>
+                    
+      </div>
+      <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+        <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/ztzl" target="_blank">
+          <div class="more-icon"></div>更多
+        </a>
+      </div>
+      <!-- 手机端专题专栏 -->
+      <div class="ztzl-card-mobile pr wow fadeInUp swiper-container-initialized swiper-container-horizontal animated" data-wow-delay="0.5s" style="visibility: visible; animation-delay: 0.5s;">
+        <div class="swiper-wrapper" style="transition-duration: 300ms;"><div class="swiper-slide swiper-slide-duplicate swiper-slide-duplicate-active" data-swiper-slide-index="5">
+  <div class="swiper-slide-banner">
+    <a href="http://fysj.jzxy.edu.cn/" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/653fa60e08290.png" alt="">
+    </a>
+  </div>
+</div>
+             <div class="swiper-slide" data-swiper-slide-index="0">
+  <div class="swiper-slide-banner">
+    <a href="https://www.jzxy.edu.cn/esjszqh.html" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/69294e19cb547.jpg" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide" data-swiper-slide-index="1">
+  <div class="swiper-slide-banner">
+    <a href="http://www.sxdygbjy.gov.cn//ztzl/zybxgdxxjy/index.html" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/67e9ee584f6b0.png" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide" data-swiper-slide-index="2">
+  <div class="swiper-slide-banner">
+    <a href="https://www.12371.cn/special/20jszqh/" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/66ac6c0d9ec50.jpg" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide" data-swiper-slide-index="3">
+  <div class="swiper-slide-banner">
+    <a href="http://jwc.jzxy.edu.cn/bkjyjxshpgw.html" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/6629fc4263f56.jpg" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide" data-swiper-slide-index="4">
+  <div class="swiper-slide-banner">
+    <a href="http://www.sxdi.gov.cn/qfjy2/jgjf/index.html" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/653fa5eb2782a.png" alt="">
+    </a>
+  </div>
+</div>
+    <div class="swiper-slide" data-swiper-slide-index="5">
+  <div class="swiper-slide-banner">
+    <a href="http://fysj.jzxy.edu.cn/" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/653fa60e08290.png" alt="">
+    </a>
+  </div>
+</div>
+                    
+        <div class="swiper-slide swiper-slide-duplicate" data-swiper-slide-index="0">
+  <div class="swiper-slide-banner">
+    <a href="https://www.jzxy.edu.cn/esjszqh.html" target="_blank" class="banner-img">
+      <img class="img-width" src="./晋中学院_files/69294e19cb547.jpg" alt="">
+    </a>
+  </div>
+</div></div>
+        <div class="banner-pagination pa swiper-pagination-bullets"></div>
+      <span class="swiper-notification" aria-live="assertive" aria-atomic="true"></span></div>
+    </div>
+    <script type="text/javascript">
+      //   专题专栏
+      let ztzlSwiper = new Swiper(".ztzl-card-mobile", {
+        loop: true,
+        autoplay: {
+          delay: 5000,//1秒切换一次
+        },
+        pagination: {
+          el: ".ztzl-card-mobile .banner-pagination",
+        },
+      });
+    </script>
+  </div>
+  <!--  通知公告/媒体学院-->
+  <div class="notice-media pr">
+    <div class="notice-media-line"></div>
+    <div class="notice-media-block">
+      <!-- 通知公告-->
+      <div class="notice-block pr">
+        <div class="page-center">
+          <div class="index-title index-title-white flex-c-c wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+            <div class="title-icon1 title-icon1-white flex-c-c pr">
+              <div class="title-icon-img">
+                <img class="img-cover" src="./晋中学院_files/title_icon02.png" alt="">
+              </div>
+              <div class="title-circle pa">
+                <div class="circle-small pa"></div>
+              </div>
+            </div>
+            <div class="title-bold pr">
+              <p class="pr title-text">通知公告</p>
+            </div>
+            <a href="https://www.jzxy.edu.cn/index_tzgg" target="_blank" class="title-icon2 index-more"><img class="img-scale" src="./晋中学院_files/title-arrow02.png" alt=""></a>
+          </div>
+          <div class="flex-c-e index-more-block wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+            <a class="index-more index-more-white pointer flex-c" href="https://www.jzxy.edu.cn/index_tzgg" target="_blank">
+              <div class="more-icon"></div>更多
+            </a>
+          </div>
+          <div class="notice-content flex-wrap  wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+               <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103501.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-09-11</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">晋中学院安全设备维保与升级服务成交结果公告</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+    <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103395.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-09-07</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">晋中学院安全设备维保与升级服务采购公告</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+    <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103394.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-09-04</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">晋中学院10KV高压设备维保服务成交结果公告</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+    <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103311.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-09-03</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">2026年报废资产公示</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+    <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103234.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-08-24</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">晋中学院10KV高压设备维保服务项目采购公告（二次）</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+    <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103228.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-08-21</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">晋中学院10KV高压设备维保服务废标公告</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+    <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103227.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-08-21</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">晋中学院档案馆新增气体灭火系统工程成交结果公告</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+    <div class="notice-content-list pr">
+  <a href="http://www.jzxy.edu.cn/index_tzgg/content_103178.html" target="_blank" class="flex-c pr notice-list-a">
+    <div class="notice-list-left pr flex-c-c">
+      <p class="pr"> 2026-08-11</p>
+    </div>
+    <div class="notice-list-right ellipsis_2">晋中学院10KV高压设备维保服务磋商公告</div>
+    <div class="figcaption"></div>
+  </a>
+</div>
+              </div>
+        </div>
+        <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+          <a class="index-more index-more-white pointer flex-c" href="https://www.jzxy.edu.cn/index_tzgg" target="_blank">
+            <div class="more-icon"></div>更多
+          </a>
+        </div>
+      </div>
+      <!-- 媒体学院-->
+      <div class="media-block pr">
+        <div class="media-center pa"></div>
+        <div class="page-center pr">
+          <div class="media-content pr">
+            <div class="media-title  wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+              <img src="./晋中学院_files/jzxy_2.png" class="img-cover ">
+            </div>
+            <div class="flex-c-e index-more-block  wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+              <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/jymt" target="_blank">
+                <div class="more-icon"></div>更多
+              </a>
+            </div>
+            <div class="media-list-block flex-s-c  wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+							   <div class="media-list pr wow fadeInUp" data-wow-delay="0.3s" style="visibility: hidden; animation-delay: 0.3s; animation-name: inherit;">
+  <a href="https://apphhplushttps.sxrtv.com//a/a/l/video_wap_1215973.html?site=53&amp;color=0697F4" target="_blank" class="flex-column pr media-list-a">
+    <div class="media-list-top pr flex-c-sb">
+      <div class="media-list-top-title">
+   <img src="./晋中学院_files/logo5.png" class="img-height">
+      </div>
+      <div class="media-list-top-time flex-c-c">2026-09-10</div>
+    </div>
+    <div class="media-list-center ellipsis_2">大力弘扬教育家精神 共筑尊师重教风尚 全省各地各校开展多彩活动庆祝教师节</div>
+           <div class="media-list-bottom ellipsis_4">大力弘扬教育家精神 共筑尊师重教风尚 全省各地各校开展多彩活动庆祝教师节</div>
+        
+  </a>
+</div>
+    <div class="media-list pr wow fadeInUp" data-wow-delay="0.3s" style="visibility: hidden; animation-delay: 0.3s; animation-name: inherit;">
+  <a href="https://nginx-sxrb.app.sxrbw.com/sxrb/site1/m/c4/a44505.html?paperId=1&amp;paperType=0&amp;colId=4&amp;appVersion=3.2.1&amp;xyt=1785720318735" target="_blank" class="flex-column pr media-list-a">
+    <div class="media-list-top pr flex-c-sb">
+      <div class="media-list-top-title">
+ 
+   <img src="./晋中学院_files/653fad9295c99.png" class="img-height">
+      </div>
+      <div class="media-list-top-time flex-c-c">2026-08-03</div>
+    </div>
+    <div class="media-list-center ellipsis_2">晋中学院联动中小学打造“党团队一体化·行走的思政课”</div>
+           <div class="media-list-bottom ellipsis_4">晋中学院联动中小学打造“党团队一体化·行走的思政课”</div>
+        
+  </a>
+</div>
+    <div class="media-list pr wow fadeInUp" data-wow-delay="0.3s" style="visibility: hidden; animation-delay: 0.3s; animation-name: inherit;">
+  <a href="https://nginx-sxrb.app.sxrbw.com/sxrb/site1/mweb/ja9rn/c2150011.html" target="_blank" class="flex-column pr media-list-a">
+    <div class="media-list-top pr flex-c-sb">
+      <div class="media-list-top-title">
+ 
+   <img src="./晋中学院_files/653fad9295c99.png" class="img-height">
+      </div>
+      <div class="media-list-top-time flex-c-c">2026-08-03</div>
+    </div>
+    <div class="media-list-center ellipsis_2">晋中学院联动中小学生走进黄崖洞—— 一堂跨越三学段的实景红色大思政课</div>
+           <div class="media-list-bottom ellipsis_4">晋中学院联动中小学生走进黄崖洞—— 一堂跨越三学段的实景红色大思政课</div>
+        
+  </a>
+</div>
+    <div class="media-list pr wow fadeInUp" data-wow-delay="0.3s" style="visibility: hidden; animation-delay: 0.3s; animation-name: inherit;">
+  <a href="https://nginx-sxrb.app.sxrbw.com/sxrb/site1/mweb/ja9r8/c2144403.html?xyt=1783842806574" target="_blank" class="flex-column pr media-list-a">
+    <div class="media-list-top pr flex-c-sb">
+      <div class="media-list-top-title">
+   <img src="./晋中学院_files/logo5.png" class="img-height">
+      </div>
+      <div class="media-list-top-time flex-c-c">2026-07-12</div>
+    </div>
+    <div class="media-list-center ellipsis_2">【社科之窗】第七届(2026)山西社会科学学术活动月正式启幕</div>
+           <div class="media-list-bottom ellipsis_4">【社科之窗】第七届(2026)山西社会科学学术活动月正式启幕</div>
+        
+  </a>
+</div>
+                </div>
+          </div>
+        </div>
+        <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+          <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/jymt" target="_blank">
+            <div class="more-icon"></div>更多
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--  美丽校园-->
+  <div class="school-block pr">
+    <div class="page-center">
+      <div class="index-title flex-c-c  wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+        <div class="title-icon1 flex-c-c pr">
+          <div class="title-icon-img">
+            <img class="img-cover" src="./晋中学院_files/title_icon.png" alt="">
+          </div>
+          <div class="title-circle pa">
+            <div class="circle-small pa"></div>
+          </div>
+        </div>
+        <div class="title-bold pr">
+          <p class="pr title-text">美丽校园</p>
+        </div>
+        <a href="https://www.jzxy.edu.cn/xycs" target="_blank" class="title-icon2 index-more"><img class="img-scale" src="./晋中学院_files/title-arrow.png" alt=""></a>
+      </div>
+      <div class="flex-c-e index-more-block  wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+        <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/xycs" target="_blank">
+          <div class="more-icon"></div>更多
+        </a>
+      </div>
+      <div class="school-main flex-c-c wow fadeInUp" style="visibility: hidden; animation-name: inherit;">
+        <a href="https://www.jzxy.edu.cn/xycs" target="_blank" class="school-card pr wow fadeInUp" data-wow-delay="0.2s" style="visibility: hidden; animation-delay: 0.2s; animation-name: inherit;">
+          <div class="card-img pr">
+            <div class="card-img-over"><img class="img-cover" src="./晋中学院_files/school01.png" alt=""></div>
+            <div class="card-tt pa">校园·春色</div>
+            <div class="card-hea pa">晋中学院</div>
+          </div>
+          <div class="card-cir top pa"></div>
+          <div class="card-cir bottom pa"></div>
+        </a>
+        <a href="https://www.jzxy.edu.cn/xyfg" target="_blank" class="school-card pr  wow fadeInUp" data-wow-delay="0.25s" style="visibility: hidden; animation-delay: 0.25s; animation-name: inherit;">
+          <div class="card-img pr">
+            <div class="card-img-over"><img class="img-cover" src="./晋中学院_files/school02.png" alt="">&gt;</div>
+            <div class="card-tt pa">校园·风光</div>
+            <div class="card-hea pa">晋中学院</div>
+          </div>
+          <div class="card-cir top pa"></div>
+          <div class="card-cir bottom pa"></div>
+        </a>
+        <a href="https://www.jzxy.edu.cn/xyyj" target="_blank" class="school-card pr  wow fadeInUp" data-wow-delay="0.3s" style="visibility: hidden; animation-delay: 0.3s; animation-name: inherit;">
+          <div class="card-img pr">
+            <div class="card-img-over"><img class="img-cover" src="./晋中学院_files/school03.png" alt="">&gt;</div>
+            <div class="card-tt pa">校园·一角</div>
+            <div class="card-hea pa">晋中学院</div>
+          </div>
+          <div class="card-cir top pa"></div>
+          <div class="card-cir bottom pa"></div>
+        </a>
+        <a href="https://www.jzxy.edu.cn/xysh" target="_blank" class="school-card pr  wow fadeInUp" data-wow-delay="0.35s" style="visibility: hidden; animation-delay: 0.35s; animation-name: inherit;">
+          <div class="card-img pr">
+            <div class="card-img-over"><img class="img-cover" src="./晋中学院_files/school04.png" alt="">&gt;</div>
+            <div class="card-tt pa">校园·生活</div>
+            <div class="card-hea pa">晋中学院</div>
+          </div>
+          <div class="card-cir top pa"></div>
+          <div class="card-cir bottom pa"></div>
+        </a>
+        <a href="https://www.jzxy.edu.cn/xyzl" target="_blank" class="school-card pr  wow fadeInUp" data-wow-delay="0.4s" style="visibility: hidden; animation-delay: 0.4s; animation-name: inherit;">
+          <div class="card-img pr">
+            <div class="card-img-over"><img class="img-cover" src="./晋中学院_files/school05.png" alt="">&gt;</div>
+            <div class="card-tt pa">校园·总览</div>
+            <div class="card-hea pa">晋中学院</div>
+          </div>
+          <div class="card-cir top pa"></div>
+          <div class="card-cir bottom pa"></div>
+        </a>
+      </div>
+    </div>
+    <div class="flex-c-e index-more-block-mobile wow fadeInUp animated" data-wow-delay="0.8s" style="visibility: visible; animation-delay: 0.8s;">
+      <a class="index-more pointer flex-c" href="https://www.jzxy.edu.cn/xycs" target="_blank">
+        <div class="more-icon"></div>更多
+      </a>
+    </div>
+  </div>
+<!--  工具栏-->
+  <div class="tool-block">
+    <div class="page-center flex-c-sb tool-main wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+      <a target="_blank" href="http://fysj.jzxy.edu.cn/" class="flex-column-c-c fast-item wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon1.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon1.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">非遗数字博物馆</div>
+      </a>
+      <a target="_blank" href="https://www.4dkankan.com/spg.html?m=KJ-U02iLFbqvZ8&amp;lang=zh&amp;open=wx_friend" class="flex-column-c-c fast-item wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon9.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon9.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">非遗全景虚拟展厅</div>
+      </a>
+      <a target="_blank" href="http://rsc.jzxy.edu.cn/rczp.htm" class="fast-item flex-column-c-c wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon2.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon2.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">公开招聘</div>
+      </a>
+      <a target="_blank" href="http://portal.jzxy.edu.cn/" class="fast-item flex-column-c-c wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon3.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon3.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">统一信息门户</div>
+      </a>
+<!--       <a target="_blank" href="http://www.jzxy.edu.cn/xyzx/content_79467.html" class="fast-item flex-column-c-c wow zoomIn">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src=" /templates/index/image/zz/syOctoberThirty/tool_fill_icon4.png" class="img-scale" alt="">
+            <img src=" /templates/index/image/zz/syOctoberThirty/tool_icon4.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">微信号</div>
+      </a> -->
+      <a target="_blank" href="http://net.jzxy.edu.cn/" class="fast-item flex-column-c-c wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon5.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon5.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">信息服务</div>
+      </a>
+      <a target="_blank" href="http://mail.jzxy.edu.cn/" class="fast-item flex-column-c-c wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon6.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon6.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">教工邮箱</div>
+      </a>
+      <a target="_blank" href="http://mail.jzxy.edu.cn/" class="fast-item flex-column-c-c wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon7.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon7.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">学生邮箱</div>
+      </a>
+      <a target="_blank" href="https://www.jzxy.edu.cn/ldxx" class="fast-item flex-column-c-c wow zoomIn" style="visibility: hidden; animation-name: inherit;">
+        <div class="fast-icon flex-c-c">
+          <div class="fast-icon-img flex-c-c">
+            <img src="./晋中学院_files/tool_fill_icon8.png" class="img-scale" alt="">
+            <img src="./晋中学院_files/tool_icon8.png" class="img-scale" alt="">
+          </div>
+        </div>
+        <div class="fast-name">领导信箱</div>
+      </a>
+    </div>
+  </div>
+  <!--  底部-->
+	<div class="footer">
+    <div class="footer-top flex-c">
+      <div class="page-center flex-c-sb">
+                        
+<div class="footer-top-left flex-column">
+          <a href="https://www.jzxy.edu.cn/" class="footer-top-left-logo">
+            <img src="./晋中学院_files/footer_logo.png" class="img-cover">
+          </a>
+          <div class="footer-top-left-news flex-wrap">
+            <div class="flex-c news-list">
+              <div class="news-list-icon">
+                <img src="./晋中学院_files/footer_icon1.png" class="img-cover">
+              </div>
+              <p>办公电话:0351-3985600</p>
+            </div>
+            <div class="flex-c news-list">
+              <div class="news-list-icon">
+                <img src="./晋中学院_files/footer_icon2.png" class="img-cover">
+              </div>
+              <p>邮编：030619</p>
+            </div>
+            <div class="flex-c news-list">
+              <div class="news-list-icon">
+                <img src="./晋中学院_files/footer_icon3.png" class="img-cover">
+              </div>
+              <p>招办电话:0351-3985777</p>
+            </div>
+            <div class="flex-c news-list">
+              <div class="news-list-icon">
+                <img src="./晋中学院_files/footer_icon4.png" class="img-cover">
+              </div>
+              <p><a href="http://www.jzxy.edu.cn/" target="_blank">官网：http://www.jzxy.edu.cn/</a></p>
+            </div>
+            <div class="flex-c news-list">
+              <div class="news-list-icon">
+                <img src="./晋中学院_files/footer_icon5.png" class="img-cover">
+              </div>
+              <p>传真号码:0351-3985500</p>
+            </div>
+            <div class="flex-c news-list">
+              <div class="news-list-icon">
+                <img src="./晋中学院_files/footer_icon6.png" class="img-cover">
+              </div>
+              <p>地址：山西省晋中市榆次区文华街199号
+
+</p>
+            </div>
+
+          </div>
+        </div>
+         <div class="footer-top-center">
+          <p class="footer-top-cente-title">友情链接</p>
+          <div class="footer-top-cente-block flex-wrap">
+            
+    <div class="block-list"><a target="_blank" href="http://www.people.com.cn/">人民网</a></div>
+    <div class="block-list"><a target="_blank" href="http://www.xinhuanet.com/">新华网</a></div>
+    <div class="block-list"><a target="_blank" href="http://www.cnki.net/">中国知网</a></div>
+    <div class="block-list"><a target="_blank" href="http://www.moe.gov.cn/">中华人民共和国教育部</a></div>
+    <div class="block-list"><a target="_blank" href="http://jyt.shanxi.gov.cn/">山西省教育厅</a></div>
+
+          </div>
+        </div>
+          <div class="footer-top-right flex">
+    <div class="qrcode flex-column-c">
+      <div class="qrcode-img">
+        <img src="./晋中学院_files/wechat_qrcode.jpg" class="img-cover">
+      </div>
+      <p>晋中学院公众号</p>
+    </div>
+    <div class="qrcode flex-column-c">
+      <div class="qrcode-img">
+        <img src="./晋中学院_files/shipinhao_qrcode.png" class="img-cover">
+      </div>
+      <p>晋中学院视频号</p>
+    </div>
+    <div class="qrcode  flex-column-c">
+      <div class="qrcode-img">
+        <img src="./晋中学院_files/douyin_qrcode.png" class="img-cover">
+      </div>
+      <p>晋中学院抖音</p>
+    </div>
+  </div>
+      </div>
+    </div>
+    
+                
+<div class="footer-bottom flex-c-c">
+      非经营性互联网信息服务审批号　<a href="https://beian.miit.gov.cn/#/Integrated/index" target="_blank">晋ICP备15009101号-1</a> 版权所有 ©党委宣传部    </div>  
+   </div>
+
+
+<script type="text/javascript">
+  let isTop = true;
+  new WOW().init();
+  var wow = new WOW({
+    offset:0,
+    mobile: false,
+    live: true,
+    duration:5000
+  });
+  wow.init();
+  let newsSwiper = new Swiper(".special-swiper", {
+    loop: false,
+    autoplay: true,
+    slidesPerView: 2,
+    slidesPerColumn: 2,
+    slidesPerColumnFill: 'row',
+    spaceBetween: 30,
+  });
+</script>
+</body></html>
