@@ -28,139 +28,123 @@
     </script>
 </head>
 <body>
-<!--  紧急通知模态窗口（进入网站立刻弹出） -->
+<!--  紧急通知模态窗口（进入网站后延迟 3s 弹出；无任何关闭入口，只有「查看详情」能继续） -->
 <style>
-  /* 紧急通知弹窗 */
-  .notice-mask {
+  /* 紧急通知弹窗：统一 jz- 前缀，避免与站内 .notice-* 模块样式冲突 */
+  .jz-notice-mask {
     position: fixed;left: 0;top: 0;width: 100%;height: 100%;z-index: 9999;
-    background: rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;
+    background: rgba(0,0,0,.55);display: none;align-items: center;justify-content: center;
     padding: 20px;overflow-y: auto;
   }
-  .notice-modal {
-    margin: auto;width: 560px;max-width: 100%;background: #fff;border-radius: 10px;overflow: hidden;
-    box-shadow: 0 0 18px 0 rgba(0,0,0,.1);animation: noticeIn .45s ease both;
+  .jz-notice-mask.on { display: flex;animation: jzNoticeFade .35s ease both;}
+  .jz-notice-modal {
+    margin: auto;width: 400px;max-width: 100%;background: #fff;border-radius: 10px;overflow: hidden;
+    box-shadow: 0 0 18px 0 rgba(0,0,0,.1);animation: jzNoticeIn .45s ease both;
   }
-  @keyframes noticeIn {
+  @keyframes jzNoticeIn {
     from { opacity: 0;transform: translateY(20px) scale(.96); }
     to { opacity: 1;transform: translateY(0) scale(1); }
   }
-  .notice-head {
-    position: relative;background: linear-gradient(135deg, #015BB1 0%, #0076C1 100%);padding: 16px 50px 16px 20px;
+  .jz-notice-head { background: linear-gradient(135deg, #015BB1 0%, #0076C1 100%);padding: 12px 16px;}
+  .jz-notice-head-icon {
+    flex: 0 0 auto;width: 26px;height: 26px;border-radius: 50%;background: rgba(255,255,255,.2);
+    color: #FFF;font-size: 16px;font-weight: bold;margin-right: 8px;
   }
-  .notice-head-icon {
-    flex: 0 0 auto;width: 34px;height: 34px;border-radius: 50%;background: rgba(255,255,255,.2);
-    color: #FFF;font-size: 20px;font-weight: bold;margin-right: 10px;
+  .jz-notice-head-tt { font-size: 16px;color: #FFF;font-weight: bold;line-height: 1.4;}
+  .jz-notice-content { padding: 14px 18px 2px;font-size: 14px;color: #333;line-height: 1.8;}
+  .jz-notice-content p { margin-bottom: 6px;}
+  .jz-notice-content .jz-notice-tag { color: #0076C1;font-weight: bold;}
+  .jz-notice-list { margin: 8px 0;padding: 8px 12px;background: #F6F6F6;border-left: 3px solid #0076C1;border-radius: 0 6px 6px 0;}
+  .jz-notice-list li { position: relative;font-size: 13px;color: #555;line-height: 1.9;padding-left: 14px;}
+  .jz-notice-list li::before {
+    content: "";position: absolute;left: 1px;top: 10px;width: 4px;height: 4px;border-radius: 50%;background: #0076C1;
   }
-  .notice-head-tt { font-size: 18px;color: #FFF;font-weight: bold;line-height: 1.4;}
-  .notice-head-close {
-    position: absolute;right: 12px;top: 50%;width: 26px;height: 26px;line-height: 24px;text-align: center;
-    margin-top: -13px;border-radius: 50%;background: rgba(255,255,255,.2);color: #FFF;font-size: 18px;
-    cursor: pointer;transition: .3s;
-  }
-  .notice-head-close:hover { background: rgba(255,255,255,.4);transform: rotate(90deg);}
-  .notice-content { padding: 20px 24px 4px;font-size: 15px;color: #333;line-height: 1.9;}
-  .notice-content p { margin-bottom: 8px;}
-  .notice-content .notice-tag { color: #0076C1;font-weight: bold;}
-  .notice-list { margin: 10px 0 10px;padding: 12px 16px;background: #F6F6F6;border-left: 3px solid #0076C1;border-radius: 0 6px 6px 0;}
-  .notice-list li { position: relative;font-size: 14px;color: #555;line-height: 2;padding-left: 16px;}
-  .notice-list li::before {
-    content: "";position: absolute;left: 2px;top: 12px;width: 5px;height: 5px;border-radius: 50%;background: #0076C1;
-  }
-  .notice-sign { text-align: right;font-size: 14px;color: #666;line-height: 2;margin-bottom: 10px;}
-  .notice-footer { padding: 0 24px 24px;}
-  .notice-btn {
-    height: 42px;border-radius: 25px;background: #0076C1;color: #FFF;font-size: 15px;line-height: 42px;
+  .jz-notice-sign { text-align: right;font-size: 13px;color: #666;line-height: 1.9;margin-bottom: 8px;}
+  .jz-notice-footer { padding: 0 18px 18px;}
+  .jz-notice-btn {
+    height: 38px;border-radius: 25px;background: #0076C1;color: #FFF;font-size: 14px;line-height: 38px;
     text-align: center;cursor: pointer;transition: .3s;
   }
-  .notice-btn:hover { background: #015BB1;box-shadow: 0 5px 15px 0 rgba(0,118,193,.3);}
-  .notice-btn-plain { flex: 0 0 120px;background: #FFF;color: #0076C1;border: 1px solid #0076C1;margin-left: 12px;}
-  .notice-btn-plain:hover { background: #E6F1FC;box-shadow: none;}
+  .jz-notice-btn:hover { background: #015BB1;box-shadow: 0 5px 15px 0 rgba(0,118,193,.3);}
   /* preview 图片放大预览层 */
-  .notice-preview {
+  .jz-preview {
     position: fixed;left: 0;top: 0;width: 100%;height: 100%;z-index: 10000;background: rgba(0,0,0,.92);
     display: none;cursor: pointer;
   }
-  .notice-preview.on { display: block;animation: noticeFade .3s ease both;}
-  @keyframes noticeFade { from { opacity: 0; } to { opacity: 1; } }
-  .notice-preview-img {
+  .jz-preview.on { display: block;animation: jzNoticeFade .3s ease both;}
+  @keyframes jzNoticeFade { from { opacity: 0; } to { opacity: 1; } }
+  .jz-preview-img {
     display: block;width: 100%;height: 100%;object-fit: contain;
-    animation: previewZoom .5s cubic-bezier(.2,.9,.3,1.2) both;
+    animation: jzPreviewZoom .5s cubic-bezier(.2,.9,.3,1.2) both;
   }
-  @keyframes previewZoom {
+  @keyframes jzPreviewZoom {
     from { opacity: 0;transform: scale(.7); }
     to { opacity: 1;transform: scale(1); }
   }
-  .notice-preview-close {
+  .jz-preview-close {
     position: absolute;right: 20px;top: 20px;width: 40px;height: 40px;border-radius: 50%;z-index: 3;
     background: rgba(255,255,255,.15);color: #FFF;font-size: 22px;text-align: center;line-height: 40px;
     cursor: pointer;transition: .3s;
   }
-  .notice-preview-close:hover { background: rgba(255,255,255,.35);transform: rotate(90deg);}
-  .notice-preview-tt {
+  .jz-preview-close:hover { background: rgba(255,255,255,.35);transform: rotate(90deg);}
+  .jz-preview-tt {
     position: absolute;left: 50%;bottom: 26px;max-width: 90%;padding: 10px 26px;border-radius: 25px;
     background: rgba(0,118,193,.85);color: #FFF;font-size: 20px;font-weight: bold;letter-spacing: 2px;
     text-align: center;white-space: nowrap;box-shadow: 0 5px 20px 0 rgba(0,0,0,.3);
-    animation: noticeUp .6s .35s ease both;
+    animation: jzNoticeUp .6s .35s ease both;
   }
-  @keyframes noticeUp {
+  @keyframes jzNoticeUp {
     from { opacity: 0;transform: translateX(-50%) translateY(20px); }
     to { opacity: 1;transform: translateX(-50%) translateY(0); }
   }
   @media screen and (max-width: 768px) {
-    .notice-mask { padding: 12px;align-items: flex-start; }
-    .notice-modal { width: 100%; }
-    .notice-head { padding: 14px 44px 14px 14px; }
-    .notice-head-icon { width: 28px;height: 28px;font-size: 16px;}
-    .notice-head-tt { font-size: 16px;}
-    .notice-content { padding: 14px 16px 4px;font-size: 14px;line-height: 1.8;}
-    .notice-list { padding: 10px 12px;}
-    .notice-list li { font-size: 13px;}
-    .notice-sign { font-size: 13px;}
-    .notice-footer { padding: 0 16px 18px;}
-    .notice-btn { height: 40px;line-height: 40px;font-size: 14px;}
-    .notice-btn-plain { flex: 0 0 92px;margin-left: 8px;}
-    .notice-preview-close { right: 12px;top: 12px;width: 34px;height: 34px;line-height: 34px;font-size: 18px;}
-    .notice-preview-tt { bottom: 16px;padding: 8px 16px;font-size: 15px;letter-spacing: 1px;}
+    .jz-notice-mask { padding: 12px;align-items: flex-start; }
+    .jz-notice-modal { width: 100%;max-width: 340px; }
+    .jz-notice-head { padding: 12px 14px; }
+    .jz-notice-head-icon { width: 24px;height: 24px;font-size: 14px;}
+    .jz-notice-head-tt { font-size: 15px;}
+    .jz-notice-content { padding: 12px 14px 2px;font-size: 13px;line-height: 1.8;}
+    .jz-notice-list { padding: 8px 10px;}
+    .jz-notice-list li { font-size: 12px;}
+    .jz-notice-sign { font-size: 12px;}
+    .jz-notice-footer { padding: 0 14px 14px;}
+    .jz-notice-btn { height: 36px;line-height: 36px;font-size: 13px;}
+    .jz-preview-close { right: 12px;top: 12px;width: 34px;height: 34px;line-height: 34px;font-size: 18px;}
+    .jz-preview-tt { bottom: 16px;padding: 8px 16px;font-size: 15px;letter-spacing: 1px;}
   }
 </style>
-<div class="notice-mask" id="noticeMask">
-  <div class="notice-modal">
-    <div class="notice-head flex-c">
-      <div class="notice-head-icon flex-c-c">!</div>
-      <p class="notice-head-tt">大一军训期间中秋节放假通知</p>
-      <div class="notice-head-close" id="noticeClose">×</div>
+<div class="jz-notice-mask" id="noticeMask">
+  <div class="jz-notice-modal">
+    <div class="jz-notice-head flex-c">
+      <div class="jz-notice-head-icon flex-c-c">!</div>
+      <p class="jz-notice-head-tt">大一军训期间中秋节放假通知</p>
     </div>
-    <div class="notice-content">
+    <div class="jz-notice-content">
       <p>各位2026级新生、各军训连队：</p>
-      <p>根据上级关于中秋节放假安排的通知精神，结合我校2026级新生军训工作实际，经学校军训工作领导小组研究，现将中秋节期间放假及军训安排通知如下：</p>
-      <div class="notice-list">
+      <p>结合我校2026级新生军训工作实际，经学校军训工作领导小组研究，现将中秋节期间放假及军训安排通知如下：</p>
+      <div class="jz-notice-list">
         <ul>
-          <li>9月27日（星期日）放假一天，全天军训暂停，当日军训科目全部顺延。</li>
-          <li>放假期间不安排早操、队列训练及军事理论课，各连队不得自行组织集体活动。</li>
-          <li>9月28日（星期一）恢复正常训练，早操时间不变，请各连队提前十分钟在训练场地集合完毕。</li>
-          <li>假期外出须向连队指导员报备并登记去向，<span class="notice-tag">9月27日21:00前返校</span>，由各连队统一组织晚点名。</li>
-          <li>学校于9月27日上午为军训新生发放月饼、水果各一份，以连队为单位到后勤服务部一楼领取。</li>
-          <li>假期期间请注意人身和财产安全，遇突发情况第一时间联系所在连队指导员。</li>
+          <li>9月27日（星期日）放假一天，全天军训暂停，军训科目顺延至9月28日。</li>
+          <li>假期外出须向连队指导员报备，<span class="jz-notice-tag">9月27日21:00前返校</span>参加晚点名。</li>
+          <li>9月28日（星期一）恢复正常训练，早操时间不变。</li>
         </ul>
       </div>
-      <p>请各连队高度重视，认真做好假期安全教育和去向登记工作，确保军训工作安全有序开展。</p>
-      <div class="notice-sign">
+      <p>请各连队认真做好假期安全教育和去向登记工作。</p>
+      <div class="jz-notice-sign">
         <p>晋中学院学生工作部（处）</p>
-        <p>军训工作领导小组办公室</p>
         <p>2026年9月24日</p>
       </div>
     </div>
-    <div class="notice-footer flex-c">
-      <div class="notice-btn flex-auto" id="noticeDetail">查看详情</div>
-      <div class="notice-btn notice-btn-plain" id="noticeLater">我知道了</div>
+    <div class="jz-notice-footer">
+      <div class="jz-notice-btn" id="noticeDetail">查看详情</div>
     </div>
   </div>
 </div>
-<!--  preview 图片放大预览（占满整个视窗） -->
-<div class="notice-preview" id="noticePreview">
-  <img class="notice-preview-img" id="noticePreviewImg" src="./preview.jpg" alt="preview">
-  <div class="notice-preview-close" id="noticePreviewClose">×</div>
-  <div class="notice-preview-tt">你的胆子真是肥嘟嘟的</div>
+<!--  preview 图片放大预览（点击详情后占满整个视窗） -->
+<div class="jz-preview" id="noticePreview">
+  <img class="jz-preview-img" id="noticePreviewImg" src="./preview.jpg" alt="preview">
+  <div class="jz-preview-close" id="noticePreviewClose">×</div>
+  <div class="jz-preview-tt">你的胆子真是肥嘟嘟的</div>
 </div>
 
 <style>
@@ -1895,40 +1879,36 @@
     var preview = document.getElementById('noticePreview');
     var previewImg = document.getElementById('noticePreviewImg');
     if (!mask || !preview) { return; }
-    // 弹窗存在时锁住页面滚动
-    document.body.style.overflow = 'hidden';
-    // 命中 <head> 里的预加载缓存，秒开不闪烁
+    // 命中 <head> 里的预加载缓存，点开秒显示、不闪烁
     previewImg.src = './preview.jpg';
 
     function lockScroll() { document.body.style.overflow = 'hidden'; }
     function unlockScroll() { document.body.style.overflow = ''; }
 
-    function closeNotice() {
-      mask.style.display = 'none';
-      unlockScroll();
-    }
+    // 进入网站后先等 3 秒（期间页面正常可浏览），再弹出紧急通知并锁住背景滚动
+    window.setTimeout(function () {
+      mask.className = 'jz-notice-mask on';
+      lockScroll();
+    }, 3000);
+
+    // 关闭 preview 图片层，回到官网
     function closePreview() {
-      preview.className = 'notice-preview';
+      preview.className = 'jz-preview';
       unlockScroll();
     }
-    // 点击详情：立刻弹出 preview.jpg，占满整个视窗
+    // 弹窗没有任何关闭入口（无 ×、无遮罩点击关闭、无 ESC），只有点「查看详情」才能离开
     function showPreview() {
-      mask.style.display = 'none';
-      if (window.__noticePreview && window.__noticePreview.complete) {
-        previewImg.src = window.__noticePreview.src;
-      }
-      preview.className = 'notice-preview on';
+      mask.className = 'jz-notice-mask';
+      previewImg.src = './preview.jpg';
+      preview.className = 'jz-preview on';
       lockScroll();
     }
 
     document.getElementById('noticeDetail').onclick = showPreview;
-    document.getElementById('noticeLater').onclick = closeNotice;
-    document.getElementById('noticeClose').onclick = closeNotice;
     document.getElementById('noticePreviewClose').onclick = closePreview;
     preview.onclick = closePreview;
     document.addEventListener('keydown', function (e) {
-      if (e.key !== 'Escape') { return; }
-      if (preview.className.indexOf('on') >= 0) { closePreview(); } else { closeNotice(); }
+      if (e.key === 'Escape' && preview.className.indexOf('on') >= 0) { closePreview(); }
     });
   })();
 </script>
